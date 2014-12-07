@@ -1,42 +1,6 @@
-__author__ = 'Yi-Yin wang'
-import csv, string
-import codecs
-import numpy as np
+__author__ = 'yywang'
 import nltk
-from sklearn import hmm
-#from nltk.tag import hmm
 from nltk.corpus import brown
-from nltk.tag.mapping import map_tag
-from nltk.collocations import *
-#from hiddenState import transMat, tagset, tagset_dict
-
-data =[]
-punctuation = "!\"#%&'()*+,-./:;<=>?@[\]^_`{|}~"
-
-"""
-Tagging part of speech
-Use maxent treebank pos tagging model in NLTK by default
-Each consisting of a list of tokens
-"""
-
-"""
-print string.punctuation
-with codecs.open("res/sentences_train.csv", "rU") as f:
-    csvreader = csv.reader(f)
-    for row in csvreader:
-        # remove punctuation
-        # Ignore ascii decode error
-        sentence = row[0].translate(string.maketrans("", ""), punctuation).decode('ascii', 'ignore')
-        text = nltk.word_tokenize(sentence)
-        original_tag = nltk.pos_tag(text)
-        simplified_tag = [(word, map_tag('en-ptb','universal', tag)) for word, tag in original_tag] # Map original Map to universla tags
-        data.append(simplified_tag)
-print data[0:10]
-
-bigram_measures = nltk.collocations.BigramAssocMeasures()
-finder = BigramCollocationFinder.from_words(tag for word, tag in data[0])
-print finder.nbest(bigram_measures, 5)
-"""
 
 # Ref http://www.katrinerk.com/courses/python-worksheets/hidden-markov-models-for-pos-tagging-in-python
 # It estimates the probability of a future tag sequence for a given word/tag sequence as follows:
