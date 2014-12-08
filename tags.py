@@ -1,6 +1,8 @@
 __author__ = 'yywang'
 import nltk
-from nltk.corpus import brown
+from nltk import SimpleGoodTuringProbDist
+from nltk.corpus import brown,treebank
+from nltk.corpus import wordnet as wn
 
 # Ref http://www.katrinerk.com/courses/python-worksheets/hidden-markov-models-for-pos-tagging-in-python
 # It estimates the probability of a future tag sequence for a given word/tag sequence as follows:
@@ -24,8 +26,9 @@ So we start out with the brown tagged sentences,
 add the two artificial tags,
 and then make one long list of all the tag/word pairs.
 """
-brown_tags_words = [ ]
-for sent in brown.tagged_sents(tagset="universal"):
+brown_tags_words = []
+#for sent in brown.tagged_sents():#tagset="universal"):
+for sent in nltk.corpus.treebank.tagged_sents():
     # sent is a list of word/tag pairs
     # add START/START at the beginning
     brown_tags_words.append( ("START", "START") )
@@ -37,10 +40,11 @@ for sent in brown.tagged_sents(tagset="universal"):
 # conditional frequency distribution
 cfd_tagwords = nltk.ConditionalFreqDist(brown_tags_words)
 # conditional probability distribution
-cpd_tagwords = nltk.ConditionalProbDist(cfd_tagwords, nltk.MLEProbDist)
-
-print "The probability of an adjective (ADJ) being 'new' is", cpd_tagwords["ADJ"].prob("new")
-print "The probability of an adjective (ADJ) being 'new' is", cpd_tagwords["ADJ"].prob("new")
+#cpd_tagwords = nltk.ConditionalProbDist(cfd_tagwords,nltk.LaplaceProbDist, bins=len(treebank.words()))
+cpd_tagwords = nltk.ConditionalProbDist(cfd_tagwords, nltk.MLEProbDist, bins=len(treebank.words()))
+print "The probability of an adjective (ADJ) being 'new' is", cpd_tagwords["JJ"].prob("new")
+print "The probability of an ADP being 'to' is", cpd_tagwords["TO"].prob("to")
+print "The probability of an adjective (ADJ) being 'I' is", cpd_tagwords["VBN"].prob("eat")
 
 """Part 2 : P( si | s{i-1})
 Estimating P(ti | t{i-1}) from corpus data using Maximum Likelihood Estimation (MLE):
@@ -55,9 +59,14 @@ cfd_tags= nltk.ConditionalFreqDist(nltk.bigrams(brown_tags))
 # make conditional probability distribution, using
 # maximum likelihood estimate:
 # P(ti | t{i-1})
-cpd_tags = nltk.ConditionalProbDist(cfd_tags, nltk.MLEProbDist)
+
+#cpd_tags = nltk.ConditionalProbDist(cfd_tags, nltk.MLEProbDist)
+# Smoothing
+cpd_tags = nltk.ConditionalProbDist(cfd_tags, nltk.LaplaceProbDist, bins=len(brown_tags))
+
 print cpd_tags
-print "If we have just seen 'DET', the probability of 'NOUN' is", cpd_tags["DET"].prob("NOUN")
+print "If we have just seen 'DET', the probability of 'NOUN' is", cpd_tags["DT"].prob("NN")
+print "If we have just seen 'TO', the probability of 'VB' is", cpd_tags["TO"].prob("VB")
 
 """ putting things together:
 what is the probability of the tag sequence "PRO V TO V" for the word sequence "I want to race"?
@@ -68,15 +77,21 @@ P(START) * P(PRO|START) * P(I | PRO) *
            P(VB | TO) * P(race | V) *
            P(END | V)
 """
-prob_tagsequence = cpd_tags["START"].prob("PRON") * cpd_tagwords["PRON"].prob("I") * \
-    cpd_tags["PRON"].prob("VERB") * cpd_tagwords["VERB"].prob("want") * \
-    cpd_tags["VERB"].prob("ADP") * cpd_tagwords["ADP"].prob("to") * \
-    cpd_tags["ADP"].prob("VERB") * cpd_tagwords["VERB"].prob("race") * \
-    cpd_tags["VERB"].prob("END")
+prob_tagsequence = cpd_tags["START"].prob("PRP") * cpd_tagwords["PRP"].prob("I") * \
+    cpd_tags["PRP"].prob("VBP") * cpd_tagwords["VBP"].prob("want") * \
+    cpd_tags["VBP"].prob("TO") * cpd_tagwords["TO"].prob("to") * \
+    cpd_tags["TO"].prob("VB") * cpd_tagwords["VB"].prob("sleep") * \
+    cpd_tags["VB"].prob("END")
 
-print cpd_tags["START"].prob("PRON")
-print cpd_tags["PRON"].prob("VERB")
 print "The probability of the tag sequence 'START PRO V TO V END' for 'I want to race' is:", prob_tagsequence
+
+
+"""The most likely tag for "I want to __" :
+
+argmax Pr( Start,PRP,VBP,TO,X,END)
+"""
+distinct_tags = set(brown_tags)
+#print distinct_tags
 
 
 """ Viterbi
@@ -87,37 +102,71 @@ But in order to find the best tag sequence, we need the probability for _all_ ta
 What Viterbi gives us is just a good way of computing all those many probabilities
 as fast as possible.
 """
-distinct_tags = set(brown_tags)
 
 # Given a sentence
+# TODO: take sentence as parameter
 sentence = ["I", "want", "to", "race"]
 sentlen = len(sentence)
 
+def calcNextPOSprob(tags, isLastWord = True):
+    posProb =[]
+    for tag in distinct_tags:
+        if tag != u'``' and tag !=u"''":
+            prob_tagsseq = cpd_tags[tags[-1]].prob(tag)*cpd_tags[tag].prob("END")
+            posProb.append((tag,prob_tagsseq))
+
+    posProbDict = dict(sorted(posProb,reverse=True)[0:10])
+    return posProbDict
+
+
+#print calcNextPOSprob(['PRP','VB','TO'])
+
+def pos_word_suggestor(sentence, findSynonym=False):
+    text = nltk.word_tokenize(sentence)
+    tokens = nltk.pos_tag(text)
+    tags = [tag for (word,tag) in tokens]
+    posProbDict = calcNextPOSprob(tags)
+    print posProbDict
+
+    if findSynonym = True: # Use word net
+        if "NN" in tags[-1] or "VB" in tags[-1]:
+            for pos_tag in posProbDict.keys():
+                if "NN" in pos_tag:
+                    print wn.synsets(text[-1], pos=wn.NOUN)
+
+                if "VB" in pos_tag:
+                    print wn.synsets(text[-1], pos=wn.VERB)
+
+    # Generate suggestion
+
+pos_word_suggestor("I want to say")
+
+
 # viterbi: this is a list.
 # for each step i in 1 .. sentlen,
-# store a dictionary that maps each tag X
-# to the probability of the best tag sequence of length i that ends in X
+# store a dictionary that maps each tag X to
+# the probability of the best tag sequence of length i that ends in X
 viterbi = []
 
 # backpointer:
 # for each step i in 1..sentlen,
 # store a dictionary
-# that maps each tag X
-# to the previous tag in the best tag sequence of length i that ends in X
+# that maps each tag X to
+# the previous tag in the best tag sequence of length i that ends in X
 backpointer = []
 
 ##
 # we first determine the viterby dictionary for the first word:
 # For each tag, what is the probability of it following "START" and for it
 # producing the first word of the sentence?
-first_viterbi = { }
-first_backpointer = { }
+first_viterbi = {}
+first_backpointer = {}
 for tag in distinct_tags:
     # don't record anything for the START tag
     if tag == "START": continue
 
-    first_viterbi[ tag ] = cpd_tags["START"].prob(tag) * cpd_tagwords[tag].prob( sentence[0] )
-    first_backpointer[ tag ] = "START"
+    first_viterbi[tag] = cpd_tags["START"].prob(tag) * cpd_tagwords[tag].prob(sentence[0])
+    first_backpointer[tag] = "START"
 
 # store first_viterbi (the dictionary for the first word in the sentence)
 # in the viterbi list, and record that the best previous tag
@@ -128,15 +177,16 @@ backpointer.append(first_backpointer)
 
 # now we iterate over all remaining words in the sentence, from the second to the last.
 for wordindex in range(1, len(sentence)):
-         # start a new dictionary where we can store, for each tag, the probability
-     # of the best tag sequence ending in that tag
-         # for the current word in the sentence
+    # start a new dictionary where we can store, for each tag,
+    # the probability of the best tag sequence ending in that tag
+    # for the current word in the sentence
     this_viterbi = { }
-         # start a new dictionary we we can store, for each tag,
-    # the best previous tag
+
+    # start a new dictionary we we can store, for each tag, the best previous tag
     this_backpointer = { }
-         # prev_viterbi is a dictionary that stores, for each tag, the probability
-    # of the best tag sequence ending in that tag
+
+    # prev_viterbi is a dictionary that stores, for each tag,
+    # the probability of the best tag sequence ending in that tag
     # for the previous word in the sentence.
     # So it stores, for each tag, the probability of a tag sequence up to the previous word
     # ending in that tag.
@@ -170,13 +220,15 @@ for wordindex in range(1, len(sentence)):
         #        best_previous= prevtag
         #        best_prob = prob
         #
-                  # this_viterbi[ tag ] is the probability of the best tag sequence ending in tag
+
+
+        # this_viterbi[ tag ] is the probability of the best tag sequence ending in tag
         this_viterbi[ tag ] = prev_viterbi[ best_previous] * \
             cpd_tags[ best_previous ].prob(tag) * cpd_tagwords[ tag].prob(sentence[wordindex])
-                 # this_backpointer[ tag ] is the most likely previous-tag for this current tag
+        # this_backpointer[ tag ] is the most likely previous-tag for this current tag
         this_backpointer[ tag ] = best_previous
 
-        # done with all tags in this iteration
+    # done with all tags in this iteration
     # so store the current viterbi step
     viterbi.append(this_viterbi)
     backpointer.append(this_backpointer)
