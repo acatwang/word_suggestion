@@ -36,7 +36,7 @@ if spam == '2':
 			more = False
 		else:
 			query = query_sentence.split()[-1]
-			finder.apply_ngram_filter(lambda w1, w2: query not in (w1))
+			finder.apply_ngram_filter(lambda w1, w2: query != w1)
 			scored = finder.score_ngrams(bigram_measures.raw_freq)
 			results = sorted(finder.nbest(bigram_measures.raw_freq, 10))
 			finder = BigramCollocationFinder.from_words(tokens_all)
@@ -55,8 +55,8 @@ if spam == '3':
 			more = False
 		else:
 			query_1, query_2 = query_sentence.split()[-2], query_sentence.split()[-1]
-			finder.apply_ngram_filter(lambda w1, w2, w3: query_1 not in w1)
-			finder.apply_ngram_filter(lambda w1, w2, w3: query_2 not in w2)
+			finder.apply_ngram_filter(lambda w1, w2, w3: query_1 != w1)
+			finder.apply_ngram_filter(lambda w1, w2, w3: query_2 != w2)
 			scored = finder.score_ngrams(trigram_measures.raw_freq)
 			results = sorted(finder.nbest(trigram_measures.raw_freq, 10))
 			finder = TrigramCollocationFinder.from_words(tokens_all)
