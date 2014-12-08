@@ -146,6 +146,7 @@ def pos_word_suggestor(sentence, findSynonym=False):
 
     # Generate suggestion
     bigram_filter = lambda *w: text[-1] not in w  #N-gram with text[-1] as a member
+
     with open("pos_dict.json",'rb') as f:
         pos_dict = json.load(f)
         probScore_top10 = []
@@ -168,7 +169,8 @@ def pos_word_suggestor(sentence, findSynonym=False):
         print probScore_top10
 
 
-pos_word_suggestor("Thank you for your")
+#pos_word_suggestor("Thank you for your")
+pos_word_suggestor("Let\'s meet at 8 " )
 
 
 # viterbi: this is a list.
