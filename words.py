@@ -8,3 +8,7 @@ import nltk
 # (1) Enron-Email - a)word association, b) HMM
 # (2) WordNet - synonym
 # (3) AdJ Net - adj suggestion
+
+
+# baseline_suggestion
+# pos_suggestion
