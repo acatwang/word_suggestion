@@ -1,9 +1,12 @@
 __author__ = 'yywang'
+
 import nltk
 from nltk import SimpleGoodTuringProbDist
 from nltk.corpus import brown,treebank
 from nltk.corpus import wordnet as wn
-
+import json
+from wordasso import finder,bigram_measures
+import heapq
 # Ref http://www.katrinerk.com/courses/python-worksheets/hidden-markov-models-for-pos-tagging-in-python
 # It estimates the probability of a future tag sequence for a given word/tag sequence as follows:
 #
@@ -121,14 +124,18 @@ def calcNextPOSprob(tags, isLastWord = True):
 
 #print calcNextPOSprob(['PRP','VB','TO'])
 
+
 def pos_word_suggestor(sentence, findSynonym=False):
+    print "The sentence is: " + sentence
     text = nltk.word_tokenize(sentence)
+    print "The tokenized sentence is: "
+    print text
     tokens = nltk.pos_tag(text)
     tags = [tag for (word,tag) in tokens]
     posProbDict = calcNextPOSprob(tags)
     print posProbDict
 
-    if findSynonym = True: # Use word net
+    if findSynonym: # Use word net
         if "NN" in tags[-1] or "VB" in tags[-1]:
             for pos_tag in posProbDict.keys():
                 if "NN" in pos_tag:
@@ -138,8 +145,30 @@ def pos_word_suggestor(sentence, findSynonym=False):
                     print wn.synsets(text[-1], pos=wn.VERB)
 
     # Generate suggestion
+    bigram_filter = lambda *w: text[-1] not in w  #N-gram with text[-1] as a member
+    with open("pos_dict.json",'rb') as f:
+        pos_dict = json.load(f)
+        probScore_top10 = []
+        for tag in tags:
+            print "The tas is: "
+            print tag
 
-pos_word_suggestor("I want to say")
+            #finder.apply_word_filter(lambda w: w not in set([text[-1]] + pos_dict[tag]))
+            scored = finder.score_ngrams(bigram_measures.raw_freq)
+            #print sorted((bigram,score) for bigram, score in scored if text[-1]==bigram[0])
+
+            for bigram, score in scored:
+                if text[-1] == bigram[0]:
+                    if (len(probScore_top10) <10 or score>probScore_top10[0][0]) and bigram not in [t for s,t in probScore_top10]: #TODO
+                        # If the heap is full, remove the smallest element on the heap.
+                        if len(probScore_top10) == 10: heapq.heappop( probScore_top10 )
+                        # add the current element as the new smallest.
+                        heapq.heappush( probScore_top10, (score,bigram) )
+
+        print probScore_top10
+
+
+pos_word_suggestor("Thank you for your")
 
 
 # viterbi: this is a list.
