@@ -5,8 +5,9 @@ from nltk import SimpleGoodTuringProbDist
 from nltk.corpus import brown,treebank
 from nltk.corpus import wordnet as wn
 import json
-from wordasso import finder,bigram_measures
+from wordassoTable import trigram_measures,bigram_measures, finder,scored,tri_finder,tri_scored
 import heapq
+
 # Ref http://www.katrinerk.com/courses/python-worksheets/hidden-markov-models-for-pos-tagging-in-python
 # It estimates the probability of a future tag sequence for a given word/tag sequence as follows:
 #
@@ -32,6 +33,7 @@ and then make one long list of all the tag/word pairs.
 brown_tags_words = []
 #for sent in brown.tagged_sents():#tagset="universal"):
 for sent in nltk.corpus.treebank.tagged_sents():
+
     # sent is a list of word/tag pairs
     # add START/START at the beginning
     brown_tags_words.append( ("START", "START") )
@@ -111,38 +113,37 @@ as fast as possible.
 sentence = ["I", "want", "to", "race"]
 sentlen = len(sentence)
 
-def calcNextPOSprob(tags, isLastWord = True):
+def calcNextPOSprob(tags, blank_idx):
     posProb =[]
+
     for tag in distinct_tags:
         if tag != u'``' and tag !=u"''":
-            prob_tagsseq = cpd_tags[tags[-1]].prob(tag)*cpd_tags[tag].prob("END")
+            if blank_idx == len(tags):
+                prob_tagsseq = cpd_tags[tags[-1]].prob(tag)*cpd_tags[tag].prob("END")
+            else:
+                prob_tagsseq = cpd_tags[tags[blank_idx-1]].prob(tag)*cpd_tags[tag].prob(tags[blank_idx+1])
             posProb.append((tag,prob_tagsseq))
 
     posProbDict = dict(sorted(posProb,reverse=True)[0:10])
+    #print posProbDict
     return posProbDict
 
 
 #print calcNextPOSprob(['PRP','VB','TO'])
 
 
-def pos_word_suggestor(sentence, findSynonym=False):
+def pos_word_suggestor(sentence):
     print "The sentence is: " + sentence
     text = nltk.word_tokenize(sentence)
-    print "The tokenized sentence is: "
-    print text
+    try:
+        blank_idx = text.index('_')
+    except ValueError:
+        blank_idx = len(text)
     tokens = nltk.pos_tag(text)
+    #print tokens
     tags = [tag for (word,tag) in tokens]
-    posProbDict = calcNextPOSprob(tags)
-    print posProbDict
-
-    if findSynonym: # Use word net
-        if "NN" in tags[-1] or "VB" in tags[-1]:
-            for pos_tag in posProbDict.keys():
-                if "NN" in pos_tag:
-                    print wn.synsets(text[-1], pos=wn.NOUN)
-
-                if "VB" in pos_tag:
-                    print wn.synsets(text[-1], pos=wn.VERB)
+    posProbDict = calcNextPOSprob(tags,blank_idx)
+    #print posProbDict
 
     # Generate suggestion
     bigram_filter = lambda *w: text[-1] not in w  #N-gram with text[-1] as a member
@@ -150,14 +151,28 @@ def pos_word_suggestor(sentence, findSynonym=False):
     with open("pos_dict.json",'rb') as f:
         pos_dict = json.load(f)
         probScore_top10 = []
-        for tag in tags:
-            print "The tas is: "
-            print tag
+        for tag in posProbDict:
+            try:
+                for word in pos_dict[tag]:
+                    #finder.apply_ngram_filter(lambda w1, w2: w1==text[-1] and w2==word)
+                    try:
+                        #probCondWordAssoc = [elem for elem in scored if elem[0]==(text[-1],word)][0][1]
+                        probCondWordAssoc = [elem for elem in tri_scored if elem[0]==(text[blank_idx-1],word,text[blank_idx+1])][0][1]
+                    except IndexError:
+                        probCondWordAssoc= 0.000000001 # smooth
 
-            #finder.apply_word_filter(lambda w: w not in set([text[-1]] + pos_dict[tag]))
-            scored = finder.score_ngrams(bigram_measures.raw_freq)
-            #print sorted((bigram,score) for bigram, score in scored if text[-1]==bigram[0])
+                    prob = cpd_tagwords[tag].prob(word) * posProbDict[tag] * probCondWordAssoc
+                    if len(probScore_top10) <10 or prob>probScore_top10[0][0]:
+                        # If the heap is full, remove the smallest element on the heap.
+                        if len(probScore_top10) == 10: heapq.heappop( probScore_top10 )
+                        # add the current element as the new smallest.
+                        heapq.heappush( probScore_top10, (prob,word))
+            except KeyError:
+                #print tag
+                pass
 
+
+            """
             for bigram, score in scored:
                 if text[-1] == bigram[0]:
                     if (len(probScore_top10) <10 or score>probScore_top10[0][0]) and bigram not in [t for s,t in probScore_top10]: #TODO
@@ -165,12 +180,13 @@ def pos_word_suggestor(sentence, findSynonym=False):
                         if len(probScore_top10) == 10: heapq.heappop( probScore_top10 )
                         # add the current element as the new smallest.
                         heapq.heappush( probScore_top10, (score,bigram) )
+            """
+        for (prob,word) in probScore_top10:
+            print word
 
-        print probScore_top10
 
-
-#pos_word_suggestor("Thank you for your")
-pos_word_suggestor("Let\'s meet at 8 " )
+#pos_word_suggestor("I want to _ with you")
+pos_word_suggestor("Thank you for your" )
 
 
 # viterbi: this is a list.

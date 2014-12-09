@@ -25,6 +25,8 @@ with open(in_file, 'rU') as csvfile:
 # finder.apply_freq_filter(3)
 # print finder.nbest(bigram_measures.pmi, 10)
 
+
+
 #### Bigram Testing
 if spam == '2':
 	finder = BigramCollocationFinder.from_words(tokens_all)

@@ -18,15 +18,17 @@ with codecs.open("res/sentences_train.csv", "rU") as f:
 
 #pos_dict.json = dict((value, key) for (key, value) in word_tag_dict.items())
 
-for key, value in word_tag_dict.items():
-    if value in pos_dict:
-        if key not in pos_dict[value]:
-            pos_dict[value].append(key)
+for word, pos in word_tag_dict.items():
+    if pos in pos_dict:
+        if word not in pos_dict[pos]:
+            pos_dict[pos][word] = 1
+        else:
+            pos_dict[pos][word] +=1
     else:
-        pos_dict[value] = []
-        pos_dict[value].append(key)
+        pos_dict[pos] = {word: 1}
+
 
 print pos_dict
 
-with open("pos_dict.json",'wb') as f:
+with open("pos_dict_count.json",'wb') as f:
     json.dump(pos_dict, f)
